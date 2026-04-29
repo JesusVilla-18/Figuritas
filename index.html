@@ -99,10 +99,9 @@ async function cargarDatos(){
   render(datos);
 }
 
+/* RENDER SOLO PARA INICIO Y FILTRO */
 function render(lista){
   const cont = document.getElementById("contenedor");
-  const scrollY = window.scrollY;
-
   let html = "";
 
   lista.forEach(e=>{
@@ -132,9 +131,9 @@ function render(lista){
 
   cont.innerHTML = html;
   calcularProgreso();
-  window.scrollTo(0, scrollY);
 }
 
+/* MODIFICAR */
 function modificar(cod,i,c){
   let e = datos.find(x=>x.cod===cod);
 
@@ -175,12 +174,10 @@ setInterval(async ()=>{
 
 },1500);
 
-/* SYNC CORREGIDO */
+/* SYNC SIN RENDER */
 setInterval(async () => {
 
   if (guardando || cambiosPendientes.length > 0) return;
-
-  // 🔒 evita pisar cambios recientes
   if (Date.now() - ultimoCambio < 2000) return;
 
   try {
@@ -196,13 +193,16 @@ setInterval(async () => {
           c.cod === nuevo.cod && c.index === i
         );
 
-        if (!pendiente) {
+        if (!pendiente && local.estampas[i] !== v) {
           local.estampas[i] = v;
+
+          let el = document.getElementById(`v-${nuevo.cod}-${i}`);
+          if (el) el.innerText = v;
         }
       });
     });
 
-    aplicarFiltro();
+    calcularProgreso();
 
   } catch (e) {
     console.log("error sync", e);
@@ -213,10 +213,7 @@ setInterval(async () => {
 /* BUSCAR */
 function filtrar(){
   filtroActual = document.getElementById("buscar").value.toLowerCase();
-  aplicarFiltro();
-}
 
-function aplicarFiltro(){
   if(!filtroActual){
     render(datos);
     return;
