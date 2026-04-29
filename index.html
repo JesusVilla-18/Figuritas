@@ -22,17 +22,11 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
 
 #buscar { width:100%; padding:10px; border:none; }
 
-/* BARRA */
-.barra {
-  position:relative;
-  background:#ccc;
-  height:18px;
-}
+.barra { position:relative; background:#ccc; height:18px; }
 
 .progreso {
   height:100%;
   width:0%;
-  position:relative;
   background: repeating-linear-gradient(
     45deg,
     #28a745,
@@ -44,37 +38,28 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
 
 #textoProgreso {
   position:absolute;
-  top:0;
-  left:0;
   width:100%;
   height:100%;
   display:flex;
   align-items:center;
   justify-content:center;
   font-weight:bold;
-  color:black;
-  pointer-events:none;
 }
 
-/* CARDS */
 .card { background:white; margin:10px; padding:10px; border-radius:10px; }
 .grid { display:flex; overflow-x:auto; }
 .stamp { min-width:75px; text-align:center; margin:4px; background:#f9f9f9; border-radius:8px; padding:6px; }
 
 .fila { display:flex; justify-content:center; align-items:center; gap:4px; }
 
-.btn { width:24px; height:24px; font-size:14px; border:none; border-radius:6px; }
+.btn { width:24px; height:24px; border:none; border-radius:6px; }
 .minus { background:#f44336; color:white; }
 .plus { background:#4CAF50; color:white; }
 
-.num { font-size:14px; font-weight:bold; display:block; }
-.valor { min-width:22px; display:inline-block; text-align:center; font-weight:bold; }
+.num { font-weight:bold; }
+.valor { font-weight:bold; }
 
-button:disabled {
-  background:#aaa !important;
-  cursor:not-allowed;
-  opacity:0.6;
-}
+button:disabled { opacity:0.5; }
 </style>
 </head>
 
@@ -91,6 +76,7 @@ button:disabled {
   <div class="topbar">
     📄 Álbum
     <div>
+      <button id="btnEdit" onclick="toggleEdicion()">✏️</button>
       <button id="btnRep" onclick="verRepetidas()">🔁</button>
       <button id="btnFal" onclick="verFaltantes()">❌</button>
     </div>
@@ -108,144 +94,153 @@ button:disabled {
 </div>
 
 <script>
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwIaCI9Dw3zJ0B70RGlIOSoADj5zUnrPdH4hyfSTFzi2JYKLWCt3N8fU15EbvoUhWyF-A/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwO1ZvN5lQNsX9VFMCul1oUQgu2cCAZhulwHaNeSOkomidWJeTr0zihUudku9svQx0SNg/exec";
 
 let datos = [];
 let cambiosPendientes = [];
+
 let guardando = false;
-let esperandoConfirmacion = false;
+let editando = false;
+let heartbeat = null;
 
 const CLAVE = "201918";
 
+/* LOGIN */
 document.addEventListener("DOMContentLoaded", ()=>{
   if(localStorage.getItem("clave") === CLAVE){
     entrar();
   } else {
-    document.getElementById("login").style.display="block";
+    login.style.display="block";
   }
 });
 
 function acceder(){
-  if(document.getElementById("clave").value === CLAVE){
+  if(clave.value === CLAVE){
     localStorage.setItem("clave", CLAVE);
     entrar();
   }
 }
 
 function entrar(){
-  document.getElementById("login").style.display="none";
-  document.getElementById("app").style.display="block";
+  login.style.display="none";
+  app.style.display="block";
   cargarDatos();
 }
 
-function toggleBotones(estado){
-  document.getElementById("btnRep").disabled = estado;
-  document.getElementById("btnFal").disabled = estado;
+/* EDICIÓN */
+async function toggleEdicion(){
+
+  if(!editando){
+    const r = await fetch(APPS_SCRIPT_URL + "?accion=lock");
+    const res = await r.json();
+
+    if(!res.ok){
+      alert("🚫 Otro usuario está editando");
+      return;
+    }
+
+    editando = true;
+    btnEdit.innerText = "💾";
+
+    heartbeat = setInterval(()=>{
+      fetch(APPS_SCRIPT_URL + "?accion=ping");
+    },5000);
+
+  } else {
+
+    await guardarTodo();
+
+    await fetch(APPS_SCRIPT_URL + "?accion=unlock");
+
+    clearInterval(heartbeat);
+
+    editando = false;
+    btnEdit.innerText = "✏️";
+  }
+
+  render(datos);
 }
 
-function actualizarEstadoUI(){
-  const bloqueado = guardando || esperandoConfirmacion || cambiosPendientes.length > 0;
-  toggleBotones(bloqueado);
-  calcularProgreso();
+/* GUARDAR */
+async function guardarTodo(){
+  if(cambiosPendientes.length===0) return;
+
+  await fetch(APPS_SCRIPT_URL,{
+    method:"POST",
+    body: JSON.stringify(cambiosPendientes)
+  });
+
+  cambiosPendientes=[];
 }
 
+/* CARGAR */
 async function cargarDatos(){
   const r = await fetch(APPS_SCRIPT_URL + "?accion=get");
   datos = await r.json();
   render(datos);
 }
 
+/* RENDER */
 function render(lista){
-  const cont = document.getElementById("contenedor");
-  let html = "";
+  let html="";
 
   lista.forEach(e=>{
-    html += `<div class="card">
-<b>
-  <img src="escudos/${e.cod.toLowerCase()}.png" width="30" style="vertical-align:middle;">
-  ${e.cod} - ${e.pais} - pág. ${e.pag}
-</b>
-    <div class="grid">`;
+    html+=`<div class="card">
+<b>${e.cod} - ${e.pais}</b>
+<div class="grid">`;
 
     e.estampas.forEach((v,i)=>{
-      let numero = (e.cod === "FWC") ? i : i + 1;
+      let n=(e.cod==="FWC")?i:i+1;
 
-      html += `
-      <div class="stamp">
-        <span class="num">${numero}</span>
-        <div class="fila">
-          <button class="btn minus" onclick="modificar('${e.cod}',${i},-1)">−</button>
-          <span id="v-${e.cod}-${i}" class="valor">${v}</span>
-          <button class="btn plus" onclick="modificar('${e.cod}',${i},1)">+</button>
-        </div>
-      </div>`;
+      html+=`<div class="stamp">
+<span class="num">${n}</span>
+<div class="fila">
+
+${editando ? `<button class="btn minus" onclick="modificar('${e.cod}',${i},-1)">−</button>`:""}
+
+<span id="v-${e.cod}-${i}" class="valor">${v}</span>
+
+${editando ? `<button class="btn plus" onclick="modificar('${e.cod}',${i},1)">+</button>`:""}
+
+</div></div>`;
     });
 
-    html += "</div></div>";
+    html+="</div></div>";
   });
 
-  cont.innerHTML = html;
+  contenedor.innerHTML=html;
   calcularProgreso();
 }
 
+/* MODIFICAR */
 function modificar(cod,i,c){
-  let e = datos.find(x=>x.cod===cod);
+  if(!editando) return;
+
+  let e=datos.find(x=>x.cod===cod);
 
   e.estampas[i]+=c;
-  if(e.estampas[i]<0) e.estampas[i]=0;
+  if(e.estampas[i]<0)e.estampas[i]=0;
 
-  document.getElementById(`v-${cod}-${i}`).innerText = e.estampas[i];
+  document.getElementById(`v-${cod}-${i}`).innerText=e.estampas[i];
 
-  cambiosPendientes.push({ cod, index:i, valor:e.estampas[i] });
-
-  esperandoConfirmacion = true;
-  actualizarEstadoUI();
+  cambiosPendientes.push({cod,index:i,valor:e.estampas[i]});
 }
-
-/* GUARDADO */
-setInterval(async ()=>{
-  if(cambiosPendientes.length === 0 || guardando) return;
-
-  guardando = true;
-  actualizarEstadoUI();
-
-  let copia = [...cambiosPendientes];
-  cambiosPendientes = [];
-
-  try {
-    await fetch(APPS_SCRIPT_URL,{
-      method:"POST",
-      body: JSON.stringify(copia)
-    });
-  } catch(e){
-    console.log("error guardando", e);
-  }
-
-  guardando = false;
-
-  if(cambiosPendientes.length === 0){
-    esperandoConfirmacion = false;
-  }
-
-  actualizarEstadoUI();
-
-},1000);
 
 /* SYNC */
 setInterval(async ()=>{
-  if (guardando || esperandoConfirmacion) return;
+  if(editando) return;
 
-  const r = await fetch(APPS_SCRIPT_URL + "?accion=get");
-  const nuevos = await r.json();
+  const r=await fetch(APPS_SCRIPT_URL+"?accion=get");
+  const nuevos=await r.json();
 
-  nuevos.forEach(nuevo=>{
-    let local = datos.find(x=>x.cod===nuevo.cod);
+  nuevos.forEach(n=>{
+    let l=datos.find(x=>x.cod===n.cod);
 
-    nuevo.estampas.forEach((v,i)=>{
-      if(local.estampas[i] !== v){
-        local.estampas[i] = v;
-        let el = document.getElementById(`v-${nuevo.cod}-${i}`);
-        if(el) el.innerText = v;
+    n.estampas.forEach((v,i)=>{
+      if(l.estampas[i]!==v){
+        l.estampas[i]=v;
+        let el=document.getElementById(`v-${n.cod}-${i}`);
+        if(el) el.innerText=v;
       }
     });
   });
@@ -256,76 +251,66 @@ setInterval(async ()=>{
 
 /* PROGRESO */
 function calcularProgreso(){
-  let total=944,t=0;
+  let t=0;
 
   datos.forEach(e=>{
-    e.estampas.forEach(v=>{
-      if(v>0) t++;
-    });
+    e.estampas.forEach(v=>{ if(v>0) t++; });
   });
 
-  let p=Math.round((t/total)*100);
+  let p=Math.round((t/944)*100);
 
-  document.getElementById("progreso").style.width=p+"%";
-
-  if(guardando || esperandoConfirmacion || cambiosPendientes.length > 0){
-    document.getElementById("textoProgreso").innerText = "Guardando…";
-  } else {
-    document.getElementById("textoProgreso").innerText = p + "%";
-  }
+  progreso.style.width=p+"%";
+  textoProgreso.innerText = editando ? "Editando…" : p+"%";
 }
 
-/* COMPARTIR */
-function compartir(t){
-  if(navigator.share){
-    navigator.share({text:t});
-  } else {
-    navigator.clipboard.writeText(t);
-    alert("Copiado");
-  }
+/* FILTRO */
+function filtrar(){
+  let q=buscar.value.toLowerCase();
+  render(datos.filter(x=>x.cod.toLowerCase().includes(q)||x.pais.toLowerCase().includes(q)));
 }
 
+/* LISTAS */
 function verRepetidas(){
+  if(editando) return alert("Guarda primero");
+
   let t="*REPETIDAS*\n";
 
   datos.forEach(e=>{
     let r=[];
-    e.estampas.forEach((v,i)=>{
-      if(v>1){
-        let n=(e.cod==="FWC")?i:i+1;
-        r.push(n);
-      }
-    });
-    if(r.length>0){
-      t+=e.cod+" "+r.join(", ")+"\n";
-    }
+    e.estampas.forEach((v,i)=>{if(v>1) r.push((e.cod==="FWC")?i:i+1);});
+    if(r.length) t+=e.cod+" "+r.join(", ")+"\n";
   });
 
   compartir(t);
 }
 
 function verFaltantes(){
+  if(editando) return alert("Guarda primero");
+
   let t="*FALTANTES*\n";
 
   datos.forEach(e=>{
     let f=[];
-    e.estampas.forEach((v,i)=>{
-      if(v===0){
-        let n=(e.cod==="FWC")?i:i+1;
-        f.push(n);
-      }
-    });
-    if(f.length>0){
-      t+=e.cod+" "+f.join(", ")+"\n";
-    }
+    e.estampas.forEach((v,i)=>{if(v===0) f.push((e.cod==="FWC")?i:i+1);});
+    if(f.length) t+=e.cod+" "+f.join(", ")+"\n";
   });
 
   compartir(t);
 }
 
+/* SHARE */
+function compartir(t){
+  if(navigator.share){
+    navigator.share({text:t});
+  }else{
+    navigator.clipboard.writeText(t);
+    alert("Copiado");
+  }
+}
+
 /* SW */
 if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("sw.js?v=9");
+  navigator.serviceWorker.register("sw.js");
 }
 </script>
 
