@@ -2,13 +2,16 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Álbum</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#007bff">
 
 <style>
+  * {
+  box-sizing: border-box;
+}
 body { margin:0; font-family:Arial; background:#e0f7fa; }
 #login { text-align:center; padding:40px; display:none; }
 
@@ -20,7 +23,12 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
   justify-content:space-between;
 }
 
-#buscar { width:100%; padding:10px; border:none; }
+#buscar {
+  width:100%;
+  padding:10px;
+  border:none;
+  box-sizing:border-box; /* 🔥 clave */
+}
 
 /* BARRA PROGRESO */
 .barra {
