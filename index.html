@@ -23,10 +23,16 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
 #buscar { width:100%; padding:10px; border:none; }
 
 /* BARRA */
-.barra { position:relative; background:#ccc; height:18px; }
+.barra {
+  position:relative;
+  background:#ccc;
+  height:18px;
+}
+
 .progreso {
   height:100%;
   width:0%;
+  position:relative;
   background: repeating-linear-gradient(
     45deg,
     #28a745,
@@ -35,13 +41,19 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
     #5cd65c 20px
   );
 }
+
 #textoProgreso {
   position:absolute;
+  top:0;
+  left:0;
   width:100%;
-  text-align:center;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   font-weight:bold;
   color:black;
-  line-height:18px;
+  pointer-events:none;
 }
 
 /* CARDS */
@@ -57,6 +69,13 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
 
 .num { font-size:14px; font-weight:bold; display:block; }
 .valor { min-width:22px; display:inline-block; text-align:center; font-weight:bold; }
+
+/* botones deshabilitados */
+button:disabled {
+  background:#aaa !important;
+  cursor:not-allowed;
+  opacity:0.6;
+}
 </style>
 </head>
 
@@ -73,8 +92,8 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
   <div class="topbar">
     📄 Álbum
     <div>
-      <button onclick="verRepetidas()">🔁</button>
-      <button onclick="verFaltantes()">❌</button>
+      <button id="btnRep" onclick="verRepetidas()">🔁</button>
+      <button id="btnFal" onclick="verFaltantes()">❌</button>
     </div>
   </div>
 
@@ -118,6 +137,11 @@ function entrar(){
   document.getElementById("login").style.display="none";
   document.getElementById("app").style.display="block";
   cargarDatos();
+}
+
+function toggleBotones(estado){
+  document.getElementById("btnRep").disabled = estado;
+  document.getElementById("btnFal").disabled = estado;
 }
 
 async function cargarDatos(){
@@ -170,6 +194,7 @@ function modificar(cod,i,c){
   cambiosPendientes.push({ cod, index:i, valor:e.estampas[i] });
 
   esperandoConfirmacion = true;
+  toggleBotones(true); // 🔒 bloquear botones
   calcularProgreso();
 }
 
@@ -188,8 +213,11 @@ setInterval(async ()=>{
     });
 
     esperandoConfirmacion = false;
+    toggleBotones(false); // 🔓 desbloquear
 
-  } catch(e){}
+  } catch(e){
+    console.log("error guardando", e);
+  }
 
   guardando = false;
 
@@ -214,7 +242,9 @@ setInterval(async ()=>{
     });
   });
 
-  calcularProgreso();
+  esperandoConfirmacion = false;
+toggleBotones(false);
+calcularProgreso(); // 👈 importante
 
 },3000);
 
@@ -231,7 +261,13 @@ function calcularProgreso(){
   let p=Math.round((t/total)*100);
 
   document.getElementById("progreso").style.width=p+"%";
-  document.getElementById("textoProgreso").innerText = p + "%";
+
+  // 👇 aquí está la magia
+  if(guardando || esperandoConfirmacion){
+    document.getElementById("textoProgreso").innerText = "Guardando…";
+  } else {
+    document.getElementById("textoProgreso").innerText = p + "%";
+  }
 }
 
 /* COMPARTIR */
@@ -284,7 +320,7 @@ function verFaltantes(){
 
 /* SW */
 if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("sw.js?v=7");
+  navigator.serviceWorker.register("sw.js?v=8");
 }
 </script>
 
