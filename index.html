@@ -17,7 +17,12 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
 .progreso {
   height:18px;
   width:0%;
-  background: repeating-linear-gradient(45deg,#28a745,#28a745 10px,#5cd65c 10px,#5cd65c 20px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:white;
+  font-weight:bold;
+  font-size:12px;
 }
 .card { background:white; margin:10px; padding:10px; border-radius:10px; }
 .grid { display:flex; overflow-x:auto; }
@@ -52,9 +57,10 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
   <input id="buscar" placeholder="Buscar..." onkeyup="filtrar()">
 
   <div class="barra">
-    <div id="progreso" class="progreso"></div>
+  <div id="progreso" class="progreso">
+    <span id="textoProgreso"></span>
   </div>
-  <p id="textoProgreso"><b></b></p>
+</div>
 
   <div id="contenedor"></div>
 
@@ -238,7 +244,7 @@ function calcularProgreso(){
   let p=Math.round((t/total)*100);
 
   document.getElementById("progreso").style.width=p+"%";
-  document.getElementById("textoProgreso").innerHTML = "<b>" + p + "%</b>";
+  document.getElementById("textoProgreso").innerText = p + "%";
 }
 
 /* SHARE */
