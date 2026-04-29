@@ -56,9 +56,15 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
 .minus { background:#f44336; color:white; }
 .plus { background:#4CAF50; color:white; }
 
-.num { font-weight:bold; }
-.valor { font-weight:bold; }
+.num {
+  font-weight:bold;
+  font-size:14px;
+}
 
+.valor {
+  font-weight:normal;
+  font-size:13px;
+}
 button:disabled { opacity:0.5; }
 </style>
 </head>
@@ -186,7 +192,10 @@ function render(lista){
 
   lista.forEach(e=>{
     html+=`<div class="card">
-<b>${e.cod} - ${e.pais}</b>
+<b>
+  <img src="escudos/${e.cod.toLowerCase()}.png" width="30" style="vertical-align:middle;">
+  ${e.cod} - ${e.pais}
+</b>
 <div class="grid">`;
 
     e.estampas.forEach((v,i)=>{
