@@ -78,9 +78,7 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
 
 <div id="app" style="display:none">
 
-  <div class="topbar">
-    📄 Álbum
-  </div>
+  <div class="topbar">📄 Álbum</div>
 
   <input id="buscar" placeholder="Buscar..." onkeyup="filtrar()">
 
@@ -99,9 +97,8 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwIaCI9Dw3zJ0B7
 let datos = [];
 let cambiosPendientes = [];
 let guardando = false;
-let ultimoCambio = 0;
+let esperandoConfirmacion = false; // 🔥 clave
 let filtroActual = "";
-let bloqueos = {}; // 🔥 clave del fix
 
 const CLAVE = "201918";
 
@@ -168,16 +165,11 @@ function modificar(cod,i,c){
   e.estampas[i]+=c;
   if(e.estampas[i]<0) e.estampas[i]=0;
 
-  let id = `${cod}-${i}`;
-
-  // 🔒 bloquear esta celda
-  bloqueos[id] = Date.now();
-
   document.getElementById(`v-${cod}-${i}`).innerText = e.estampas[i];
 
   cambiosPendientes.push({ cod, index:i, valor:e.estampas[i] });
 
-  ultimoCambio = Date.now();
+  esperandoConfirmacion = true; // 🔥 evita rebote
   calcularProgreso();
 }
 
@@ -186,6 +178,7 @@ setInterval(async ()=>{
   if(cambiosPendientes.length===0) return;
 
   guardando = true;
+
   let copia = [...cambiosPendientes];
   cambiosPendientes = [];
 
@@ -194,16 +187,21 @@ setInterval(async ()=>{
       method:"POST",
       body: JSON.stringify(copia)
     });
-  } catch(e){}
+
+    esperandoConfirmacion = false; // ✅ ya puedes confiar en servidor
+
+  } catch(e){
+    console.log("error guardando", e);
+  }
 
   guardando = false;
 
 },1000);
 
-/* SYNC SIN PISAR CAMBIOS */
+/* SYNC SEGURO */
 setInterval(async ()=>{
 
-  if (guardando || cambiosPendientes.length > 0) return;
+  if (guardando || esperandoConfirmacion) return;
 
   const r = await fetch(APPS_SCRIPT_URL + "?accion=get");
   const nuevos = await r.json();
@@ -212,27 +210,17 @@ setInterval(async ()=>{
     let local = datos.find(x=>x.cod===nuevo.cod);
 
     nuevo.estampas.forEach((v,i)=>{
-
-      let id = `${nuevo.cod}-${i}`;
-
-      if(bloqueos[id] && Date.now() - bloqueos[id] < 3000){
-        return;
-      }
-
-      delete bloqueos[id];
-
       if(local.estampas[i] !== v){
         local.estampas[i] = v;
         let el = document.getElementById(`v-${nuevo.cod}-${i}`);
         if(el) el.innerText = v;
       }
-
     });
   });
 
   calcularProgreso();
 
-},2500);
+},3000);
 
 function filtrar(){
   filtroActual = document.getElementById("buscar").value.toLowerCase();
@@ -265,7 +253,7 @@ function calcularProgreso(){
 
 /* SW */
 if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("sw.js?v=4");
+  navigator.serviceWorker.register("sw.js?v=6");
 }
 </script>
 
