@@ -1,4 +1,4 @@
-const CACHE = "album-cache-v11";
+const CACHE = "album-cache-v12";
 
 self.addEventListener("install", e=>{
   self.skipWaiting();
