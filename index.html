@@ -132,7 +132,10 @@ function render(lista){
 
   lista.forEach(e=>{
     html += `<div class="card">
-    <b>${e.cod} - ${e.pais} - pág. ${e.pag}</b>
+<b>
+  <img src="escudos/${e.cod.toLowerCase()}.png" width="30" style="vertical-align:middle;">
+  ${e.cod} - ${e.pais} - pág. ${e.pag}
+</b>
     <div class="grid">`;
 
     e.estampas.forEach((v,i)=>{
