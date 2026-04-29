@@ -23,12 +23,7 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
 #buscar { width:100%; padding:10px; border:none; }
 
 /* BARRA */
-.barra {
-  position:relative;
-  background:#ccc;
-  height:18px;
-}
-
+.barra { position:relative; background:#ccc; height:18px; }
 .progreso {
   height:100%;
   width:0%;
@@ -40,12 +35,9 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
     #5cd65c 20px
   );
 }
-
 #textoProgreso {
   position:absolute;
   width:100%;
-  top:0;
-  left:0;
   text-align:center;
   font-weight:bold;
   color:black;
@@ -78,7 +70,13 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
 
 <div id="app" style="display:none">
 
-  <div class="topbar">📄 Álbum</div>
+  <div class="topbar">
+    📄 Álbum
+    <div>
+      <button onclick="verRepetidas()">🔁</button>
+      <button onclick="verFaltantes()">❌</button>
+    </div>
+  </div>
 
   <input id="buscar" placeholder="Buscar..." onkeyup="filtrar()">
 
@@ -97,8 +95,7 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwIaCI9Dw3zJ0B7
 let datos = [];
 let cambiosPendientes = [];
 let guardando = false;
-let esperandoConfirmacion = false; // 🔥 clave
-let filtroActual = "";
+let esperandoConfirmacion = false;
 
 const CLAVE = "201918";
 
@@ -169,7 +166,7 @@ function modificar(cod,i,c){
 
   cambiosPendientes.push({ cod, index:i, valor:e.estampas[i] });
 
-  esperandoConfirmacion = true; // 🔥 evita rebote
+  esperandoConfirmacion = true;
   calcularProgreso();
 }
 
@@ -178,7 +175,6 @@ setInterval(async ()=>{
   if(cambiosPendientes.length===0) return;
 
   guardando = true;
-
   let copia = [...cambiosPendientes];
   cambiosPendientes = [];
 
@@ -188,19 +184,16 @@ setInterval(async ()=>{
       body: JSON.stringify(copia)
     });
 
-    esperandoConfirmacion = false; // ✅ ya puedes confiar en servidor
+    esperandoConfirmacion = false;
 
-  } catch(e){
-    console.log("error guardando", e);
-  }
+  } catch(e){}
 
   guardando = false;
 
 },1000);
 
-/* SYNC SEGURO */
+/* SYNC */
 setInterval(async ()=>{
-
   if (guardando || esperandoConfirmacion) return;
 
   const r = await fetch(APPS_SCRIPT_URL + "?accion=get");
@@ -222,20 +215,7 @@ setInterval(async ()=>{
 
 },3000);
 
-function filtrar(){
-  filtroActual = document.getElementById("buscar").value.toLowerCase();
-
-  if(!filtroActual){
-    render(datos);
-    return;
-  }
-
-  render(datos.filter(x =>
-    x.cod.toLowerCase().includes(filtroActual) ||
-    x.pais.toLowerCase().includes(filtroActual)
-  ));
-}
-
+/* PROGRESO */
 function calcularProgreso(){
   let total=944,t=0;
 
@@ -251,9 +231,57 @@ function calcularProgreso(){
   document.getElementById("textoProgreso").innerText = p + "%";
 }
 
+/* COMPARTIR */
+function compartir(t){
+  if(navigator.share){
+    navigator.share({text:t});
+  } else {
+    navigator.clipboard.writeText(t);
+    alert("Copiado");
+  }
+}
+
+function verRepetidas(){
+  let t="*REPETIDAS*\n";
+
+  datos.forEach(e=>{
+    let r=[];
+    e.estampas.forEach((v,i)=>{
+      if(v>1){
+        let n=(e.cod==="FWC")?i:i+1;
+        r.push(n);
+      }
+    });
+    if(r.length>0){
+      t+=e.cod+" "+r.join(", ")+"\n";
+    }
+  });
+
+  compartir(t);
+}
+
+function verFaltantes(){
+  let t="*FALTANTES*\n";
+
+  datos.forEach(e=>{
+    let f=[];
+    e.estampas.forEach((v,i)=>{
+      if(v===0){
+        let n=(e.cod==="FWC")?i:i+1;
+        f.push(n);
+      }
+    });
+    if(f.length>0){
+      t+=e.cod+" "+f.join(", ")+"\n";
+    }
+  });
+
+  compartir(t);
+}
+
 /* SW */
 if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("sw.js?v=6");
+  navigator.serviceWorker.register("sw.js?v=7");
 }
 </script>
 
