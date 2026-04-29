@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Álbum</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#007bff">
+
+<style>
+body { margin:0; font-family:Arial; background:#e0f7fa; }
+
+/* LOGIN */
+#login { text-align:center; padding:40px; display:none; }
+
+/* TOPBAR */
+.topbar {
+  background:#007bff;
+  color:white;
+  padding:10px;
+  display:flex;
+  justify-content:space-between;
+}
+
+/* BUSCAR */
+#buscar {
+  width:100%;
+  padding:10px;
+  border:none;
+}
+
+/* PROGRESO */
+.barra { background:#ccc; }
+.progreso {
+  height:18px;
+  width:0%;
+  background: repeating-linear-gradient(
+    45deg,
+    #28a745,
+    #28a745 10px,
+    #5cd65c 10px,
+    #5cd65c 20px
+  );
+}
+
+/* CARD */
+.card {
+  background:white;
+  margin:10px;
+  padding:10px;
+  border-radius:10px;
+}
+
+/* GRID */
+.grid {
+  display:flex;
+  overflow-x:auto;
+  will-change: transform;
+}
+
+/* ESTAMPA */
+.stamp {
+  min-width:75px;
+  text-align:center;
+  margin:4px;
+  background:#f9f9f9;
+  border-radius:8px;
+  padding:6px;
+}
+
+/* FILA BOTONES */
+.fila {
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:4px;
+}
+
+/* BOTONES */
+.btn {
+  width:24px;
+  height:24px;
+  font-size:14px;
+  padding:0;
+  border:none;
+  border-radius:6px;
+}
+
+.minus { background:#f44336; color:white; }
+.plus { background:#4CAF50; color:white; }
+
+/* TEXTOS */
+.num {
+  font-size:14px;
+  font-weight:bold;
+  display:block;
+}
+
+.valor {
+  min-width:22px;
+  display:inline-block;
+  text-align:center;
+  font-weight:bold;
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <h2>Acceso</h2>
+  <input id="clave" placeholder="Código">
+  <button onclick="acceder()">Entrar</button>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+
+  <div class="topbar">
+    📄 Álbum
+    <div>
+      <button onclick="verRepetidas()">🔁</button>
+      <button onclick="verFaltantes()">❌</button>
+    </div>
+  </div>
+
+  <input id="buscar" placeholder="Buscar..." onkeyup="filtrar()">
+
+  <div class="barra">
+    <div id="progreso" class="progreso"></div>
+  </div>
+  <p id="textoProgreso"><b></b></p>
+
+  <div id="contenedor"></div>
+
+</div>
+
+<script>
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwIaCI9Dw3zJ0B70RGlIOSoADj5zUnrPdH4hyfSTFzi2JYKLWCt3N8fU15EbvoUhWyF-A/exec";
+
+let datos = [];
+let cambiosPendientes = [];
+let guardando = false;
+let filtroActual = "";
+
+/* CONTROL LOGIN SIN PARPADEO */
+const CLAVE = "201918"; // 👈 aquí defines tu clave
+const yaLogeado = localStorage.getItem("clave") === CLAVE;
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  if(yaLogeado){
+    entrar();
+  } else {
+    document.getElementById("login").style.display="block";
+  }
+});
+
+/* LOGIN */
+function acceder(){
+  if(document.getElementById("clave").value===CLAVE){
+    localStorage.setItem("clave","123");
+    entrar();
+  }
+}
+
+function entrar(){
+  document.getElementById("login").style.display="none";
+  document.getElementById("app").style.display="block";
+  cargarDatos();
+}
+
+/* CARGAR */
+async function cargarDatos(){
+  const r = await fetch(APPS_SCRIPT_URL + "?accion=get");
+  datos = await r.json();
+  render(datos);
+}
+
+/* RENDER */
+function render(lista){
+  const cont = document.getElementById("contenedor");
+
+  // 🧠 guardar scroll actual
+  const scrollY = window.scrollY;
+
+  let html = "";
+
+  lista.forEach(e=>{
+    html += `<div class="card">
+    <b>
+      <img src="escudos/${e.cod.toLowerCase()}.png" width="30" style="vertical-align:middle;">
+      ${e.cod} - ${e.pais} - pág. ${e.pag}
+    </b>
+    <div class="grid">`;
+
+    e.estampas.forEach((v,i)=>{
+
+      let numero = (e.cod === "FWC") ? i : i + 1;
+
+      html += `
+      <div class="stamp">
+        <span class="num">${numero}</span>
+        <div class="fila">
+          <button class="btn minus" onclick="modificar('${e.cod}',${i},-1)">−</button>
+          <span id="v-${e.cod}-${i}" class="valor">${v}</span>
+          <button class="btn plus" onclick="modificar('${e.cod}',${i},1)">+</button>
+        </div>
+      </div>`;
+    });
+
+    html += "</div></div>";
+  });
+
+  cont.innerHTML = html;
+
+  calcularProgreso();
+
+  // 🧠 restaurar scroll
+  window.scrollTo(0, scrollY);
+}
+
+/* MODIFICAR */
+function modificar(cod,i,c){
+  let e = datos.find(x=>x.cod===cod);
+
+  e.estampas[i]+=c;
+  if(e.estampas[i]<0) e.estampas[i]=0;
+
+  document.getElementById(`v-${cod}-${i}`).innerText = e.estampas[i];
+
+  cambiosPendientes.push({
+    cod: cod,
+    index: i,
+    valor: e.estampas[i]
+  });
+
+  calcularProgreso();
+}
+
+/* GUARDADO EN LOTE */
+setInterval(async ()=>{
+
+  if(cambiosPendientes.length===0) return;
+
+  guardando = true;
+
+  let copia = [...cambiosPendientes];
+  cambiosPendientes = [];
+
+  try {
+    await fetch(APPS_SCRIPT_URL,{
+      method:"POST",
+      body: JSON.stringify(copia)
+    });
+  } catch(e){
+    console.log("error guardando", e);
+  }
+
+  guardando = false;
+
+},1500);
+
+setInterval(async () => {
+
+  // 🔴 NO sincronizar si estás guardando o tienes cambios
+  if (guardando || cambiosPendientes.length > 0) return;
+
+  try {
+    const r = await fetch(APPS_SCRIPT_URL + "?accion=get");
+    const nuevos = await r.json();
+
+    if (JSON.stringify(nuevos) !== JSON.stringify(datos)) {
+
+      // 🧠 guardar scroll antes de actualizar
+      const scrollY = window.scrollY;
+
+      datos = nuevos;
+
+      // 🔍 reaplica filtro
+      aplicarFiltro();
+
+      // 🧠 restaurar scroll después del render
+      window.scrollTo(0, scrollY);
+    }
+
+  } catch (e) {
+    console.log("error sync", e);
+  }
+
+}, 4000);
+
+/* BUSCAR */
+
+
+function filtrar(){
+  filtroActual = document.getElementById("buscar").value.toLowerCase();
+  aplicarFiltro();
+}
+
+function aplicarFiltro(){
+  if(!filtroActual){
+    render(datos);
+    return;
+  }
+
+  render(datos.filter(x =>
+    x.cod.toLowerCase().includes(filtroActual) ||
+    x.pais.toLowerCase().includes(filtroActual)
+  ));
+}
+
+/* PROGRESO */
+function calcularProgreso(){
+  let total=944,t=0;
+
+  datos.forEach(e=>{
+    e.estampas.forEach(v=>{
+      if(v>0) t++;
+    });
+  });
+
+  let p=Math.round((t/total)*100);
+
+  document.getElementById("progreso").style.width=p+"%";
+  document.getElementById("textoProgreso").innerHTML = "<b>" + p + "%</b>";
+}
+
+/* REPETIDAS */
+function verRepetidas(){
+  let t = "*REPETIDAS*\n";
+
+  datos.forEach(e=>{
+    let r = [];
+
+    e.estampas.forEach((v,i)=>{
+      if(v > 1){
+        let numero = (e.cod === "FWC") ? i : i + 1;
+        r.push(numero);
+      }
+    });
+
+    if(r.length > 0){
+      t += e.cod + " " + r.join(", ") + "\n";
+    }
+  });
+
+  compartir(t);
+}
+
+/* FALTANTES */
+function verFaltantes(){
+  let t = "*FALTANTES*\n";
+
+  datos.forEach(e=>{
+    let f = [];
+
+    e.estampas.forEach((v,i)=>{
+      if(v === 0){
+        let numero = (e.cod === "FWC") ? i : i + 1;
+        f.push(numero);
+      }
+    });
+
+    if(f.length > 0){
+      t += e.cod + " " + f.join(", ") + "\n";
+    }
+  });
+
+  compartir(t);
+}
+
+/* SHARE */
+function compartir(t){
+  if(navigator.share){
+    navigator.share({text:t});
+  } else {
+    navigator.clipboard.writeText(t);
+    alert("Copiado");
+  }
+}
+
+/* SERVICE WORKER */
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js");
+}
+</script>
+
+</body>
+</html>
