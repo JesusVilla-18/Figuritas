@@ -80,10 +80,6 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
 
   <div class="topbar">
     📄 Álbum
-    <div>
-      <button onclick="verRepetidas()">🔁</button>
-      <button onclick="verFaltantes()">❌</button>
-    </div>
   </div>
 
   <input id="buscar" placeholder="Buscar..." onkeyup="filtrar()">
@@ -105,12 +101,12 @@ let cambiosPendientes = [];
 let guardando = false;
 let ultimoCambio = 0;
 let filtroActual = "";
+let bloqueos = {}; // 🔥 clave del fix
 
 const CLAVE = "201918";
-const yaLogeado = localStorage.getItem("clave") === CLAVE;
 
 document.addEventListener("DOMContentLoaded", ()=>{
-  if(yaLogeado){
+  if(localStorage.getItem("clave") === CLAVE){
     entrar();
   } else {
     document.getElementById("login").style.display="block";
@@ -118,8 +114,8 @@ document.addEventListener("DOMContentLoaded", ()=>{
 });
 
 function acceder(){
-  if(document.getElementById("clave").value===CLAVE){
-    localStorage.setItem("clave", CLAVE); // 🔥 FIX
+  if(document.getElementById("clave").value === CLAVE){
+    localStorage.setItem("clave", CLAVE);
     entrar();
   }
 }
@@ -172,6 +168,11 @@ function modificar(cod,i,c){
   e.estampas[i]+=c;
   if(e.estampas[i]<0) e.estampas[i]=0;
 
+  let id = `${cod}-${i}`;
+
+  // 🔒 bloquear esta celda
+  bloqueos[id] = Date.now();
+
   document.getElementById(`v-${cod}-${i}`).innerText = e.estampas[i];
 
   cambiosPendientes.push({ cod, index:i, valor:e.estampas[i] });
@@ -199,10 +200,10 @@ setInterval(async ()=>{
 
 },1500);
 
-/* SYNC SIN RENDER */
+/* SYNC SIN PISAR CAMBIOS */
 setInterval(async ()=>{
+
   if (guardando || cambiosPendientes.length > 0) return;
-  if (Date.now() - ultimoCambio < 2000) return;
 
   const r = await fetch(APPS_SCRIPT_URL + "?accion=get");
   const nuevos = await r.json();
@@ -211,17 +212,41 @@ setInterval(async ()=>{
     let local = datos.find(x=>x.cod===nuevo.cod);
 
     nuevo.estampas.forEach((v,i)=>{
+
+      let id = `${nuevo.cod}-${i}`;
+
+      if(bloqueos[id] && Date.now() - bloqueos[id] < 3000){
+        return;
+      }
+
+      delete bloqueos[id];
+
       if(local.estampas[i] !== v){
         local.estampas[i] = v;
         let el = document.getElementById(`v-${nuevo.cod}-${i}`);
         if(el) el.innerText = v;
       }
+
     });
   });
 
   calcularProgreso();
 
 },4000);
+
+function filtrar(){
+  filtroActual = document.getElementById("buscar").value.toLowerCase();
+
+  if(!filtroActual){
+    render(datos);
+    return;
+  }
+
+  render(datos.filter(x =>
+    x.cod.toLowerCase().includes(filtroActual) ||
+    x.pais.toLowerCase().includes(filtroActual)
+  ));
+}
 
 function calcularProgreso(){
   let total=944,t=0;
@@ -240,7 +265,7 @@ function calcularProgreso(){
 
 /* SW */
 if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("sw.js?v=2");
+  navigator.serviceWorker.register("sw.js?v=4");
 }
 </script>
 
