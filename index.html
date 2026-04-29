@@ -11,26 +11,58 @@
 <style>
 body { margin:0; font-family:Arial; background:#e0f7fa; }
 #login { text-align:center; padding:40px; display:none; }
-.topbar { background:#007bff; color:white; padding:10px; display:flex; justify-content:space-between; }
-#buscar { width:100%; padding:10px; border:none; }
-.barra { background:#ccc; }
-.progreso {
-  height:18px;
-  width:0%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+
+.topbar {
+  background:#007bff;
   color:white;
-  font-weight:bold;
-  font-size:12px;
+  padding:10px;
+  display:flex;
+  justify-content:space-between;
 }
+
+#buscar { width:100%; padding:10px; border:none; }
+
+/* BARRA */
+.barra {
+  position:relative;
+  background:#ccc;
+  height:18px;
+}
+
+.progreso {
+  height:100%;
+  width:0%;
+  background: repeating-linear-gradient(
+    45deg,
+    #28a745,
+    #28a745 10px,
+    #5cd65c 10px,
+    #5cd65c 20px
+  );
+}
+
+#textoProgreso {
+  position:absolute;
+  width:100%;
+  top:0;
+  left:0;
+  text-align:center;
+  font-weight:bold;
+  color:black;
+  line-height:18px;
+}
+
+/* CARDS */
 .card { background:white; margin:10px; padding:10px; border-radius:10px; }
 .grid { display:flex; overflow-x:auto; }
 .stamp { min-width:75px; text-align:center; margin:4px; background:#f9f9f9; border-radius:8px; padding:6px; }
+
 .fila { display:flex; justify-content:center; align-items:center; gap:4px; }
+
 .btn { width:24px; height:24px; font-size:14px; border:none; border-radius:6px; }
 .minus { background:#f44336; color:white; }
 .plus { background:#4CAF50; color:white; }
+
 .num { font-size:14px; font-weight:bold; display:block; }
 .valor { min-width:22px; display:inline-block; text-align:center; font-weight:bold; }
 </style>
@@ -57,10 +89,9 @@ body { margin:0; font-family:Arial; background:#e0f7fa; }
   <input id="buscar" placeholder="Buscar..." onkeyup="filtrar()">
 
   <div class="barra">
-  <div id="progreso" class="progreso">
+    <div id="progreso" class="progreso"></div>
     <span id="textoProgreso"></span>
   </div>
-</div>
 
   <div id="contenedor"></div>
 
@@ -72,8 +103,8 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwIaCI9Dw3zJ0B7
 let datos = [];
 let cambiosPendientes = [];
 let guardando = false;
-let filtroActual = "";
 let ultimoCambio = 0;
+let filtroActual = "";
 
 const CLAVE = "201918";
 const yaLogeado = localStorage.getItem("clave") === CLAVE;
@@ -88,7 +119,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
 function acceder(){
   if(document.getElementById("clave").value===CLAVE){
-    localStorage.setItem("clave","123");
+    localStorage.setItem("clave", CLAVE); // 🔥 FIX
     entrar();
   }
 }
@@ -105,17 +136,13 @@ async function cargarDatos(){
   render(datos);
 }
 
-/* RENDER SOLO PARA INICIO Y FILTRO */
 function render(lista){
   const cont = document.getElementById("contenedor");
   let html = "";
 
   lista.forEach(e=>{
     html += `<div class="card">
-    <b>
-      <img src="escudos/${e.cod.toLowerCase()}.png" width="30">
-      ${e.cod} - ${e.pais} - pág. ${e.pag}
-    </b>
+    <b>${e.cod} - ${e.pais} - pág. ${e.pag}</b>
     <div class="grid">`;
 
     e.estampas.forEach((v,i)=>{
@@ -139,7 +166,6 @@ function render(lista){
   calcularProgreso();
 }
 
-/* MODIFICAR */
 function modificar(cod,i,c){
   let e = datos.find(x=>x.cod===cod);
 
@@ -148,11 +174,7 @@ function modificar(cod,i,c){
 
   document.getElementById(`v-${cod}-${i}`).innerText = e.estampas[i];
 
-  cambiosPendientes.push({
-    cod: cod,
-    index: i,
-    valor: e.estampas[i]
-  });
+  cambiosPendientes.push({ cod, index:i, valor:e.estampas[i] });
 
   ultimoCambio = Date.now();
   calcularProgreso();
@@ -163,7 +185,6 @@ setInterval(async ()=>{
   if(cambiosPendientes.length===0) return;
 
   guardando = true;
-
   let copia = [...cambiosPendientes];
   cambiosPendientes = [];
 
@@ -172,66 +193,36 @@ setInterval(async ()=>{
       method:"POST",
       body: JSON.stringify(copia)
     });
-  } catch(e){
-    console.log("error guardando", e);
-  }
+  } catch(e){}
 
   guardando = false;
 
 },1500);
 
 /* SYNC SIN RENDER */
-setInterval(async () => {
-
+setInterval(async ()=>{
   if (guardando || cambiosPendientes.length > 0) return;
   if (Date.now() - ultimoCambio < 2000) return;
 
-  try {
-    const r = await fetch(APPS_SCRIPT_URL + "?accion=get");
-    const nuevos = await r.json();
+  const r = await fetch(APPS_SCRIPT_URL + "?accion=get");
+  const nuevos = await r.json();
 
-    nuevos.forEach(nuevo => {
-      let local = datos.find(x => x.cod === nuevo.cod);
+  nuevos.forEach(nuevo=>{
+    let local = datos.find(x=>x.cod===nuevo.cod);
 
-      nuevo.estampas.forEach((v,i) => {
-
-        let pendiente = cambiosPendientes.find(c =>
-          c.cod === nuevo.cod && c.index === i
-        );
-
-        if (!pendiente && local.estampas[i] !== v) {
-          local.estampas[i] = v;
-
-          let el = document.getElementById(`v-${nuevo.cod}-${i}`);
-          if (el) el.innerText = v;
-        }
-      });
+    nuevo.estampas.forEach((v,i)=>{
+      if(local.estampas[i] !== v){
+        local.estampas[i] = v;
+        let el = document.getElementById(`v-${nuevo.cod}-${i}`);
+        if(el) el.innerText = v;
+      }
     });
+  });
 
-    calcularProgreso();
+  calcularProgreso();
 
-  } catch (e) {
-    console.log("error sync", e);
-  }
+},4000);
 
-}, 4000);
-
-/* BUSCAR */
-function filtrar(){
-  filtroActual = document.getElementById("buscar").value.toLowerCase();
-
-  if(!filtroActual){
-    render(datos);
-    return;
-  }
-
-  render(datos.filter(x =>
-    x.cod.toLowerCase().includes(filtroActual) ||
-    x.pais.toLowerCase().includes(filtroActual)
-  ));
-}
-
-/* PROGRESO */
 function calcularProgreso(){
   let total=944,t=0;
 
@@ -247,19 +238,9 @@ function calcularProgreso(){
   document.getElementById("textoProgreso").innerText = p + "%";
 }
 
-/* SHARE */
-function compartir(t){
-  if(navigator.share){
-    navigator.share({text:t});
-  } else {
-    navigator.clipboard.writeText(t);
-    alert("Copiado");
-  }
-}
-
 /* SW */
 if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("sw.js");
+  navigator.serviceWorker.register("sw.js?v=2");
 }
 </script>
 
