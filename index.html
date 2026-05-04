@@ -310,7 +310,7 @@ function calcularProgreso(){
     e.estampas.forEach(v=>{ if(v>0) t++; });
   });
 
-  let p=Math.round((t/944)*100);
+  let p=Math.round((t/994)*100);
 
   progreso.style.width=p+"%";
   textoProgreso.innerText = editando ? "Editando…" : p+"%";
